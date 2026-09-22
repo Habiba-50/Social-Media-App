@@ -385,4 +385,11 @@ export class DatabaseRepository<TRawDocument> {
   async deleteById({ _id }: { _id: Types.ObjectId }): Promise<DeleteResult> {
     return await this.model.deleteOne({ _id });
   }
+
+
+  // Aggregate — generic passthrough for complex pipelines (e.g. cross-field
+  // sorting/filtering on embedded arrays) that the simpler helpers above can't express.
+  async aggregate<TResult = any>(pipeline: any[]): Promise<TResult[]> {
+    return await this.model.aggregate(pipeline);
+  }
 }

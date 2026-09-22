@@ -17,7 +17,7 @@ export interface IMessgae{
 }
 
 export interface IChat{
-    participants:Types.ObjectId[] | IUser[];
+    participants: (Types.ObjectId | IUser)[];
     messages?:IMessgae[]
     createdBy: Types.ObjectId | IUser;
     type: ChatEnum,

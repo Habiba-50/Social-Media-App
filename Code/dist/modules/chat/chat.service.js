@@ -164,6 +164,124 @@ class ChatService {
         }
         return chat.roomId;
     }
+    async getMyChats(user, { page = 1, size = 10 } = {}) {
+        const userId = user._id;
+        const skip = (page - 1) * size;
+        const pipeline = [
+            {
+                $match: {
+                    participants: userId,
+                    deletedAt: { $exists: false },
+                },
+            },
+            {
+                $addFields: {
+                    lastMessage: { $arrayElemAt: ["$messages", -1] },
+                },
+            },
+            {
+                $addFields: {
+                    lastActivityAt: { $ifNull: ["$lastMessage.createdAt", "$createdAt"] },
+                },
+            },
+            { $sort: { lastActivityAt: -1 } },
+            {
+                $facet: {
+                    data: [
+                        { $skip: skip },
+                        { $limit: size },
+                        {
+                            $addFields: {
+                                otherParticipantId: {
+                                    $cond: [
+                                        { $eq: ["$type", enums_1.ChatEnum.OVO] },
+                                        {
+                                            $first: {
+                                                $filter: {
+                                                    input: "$participants",
+                                                    as: "p",
+                                                    cond: { $ne: ["$$p", userId] },
+                                                },
+                                            },
+                                        },
+                                        null,
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: "SOCIAL_MEDIA_APP_USERS",
+                                localField: "otherParticipantId",
+                                foreignField: "_id",
+                                as: "otherParticipant",
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: "$otherParticipant",
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                chatId: "$_id",
+                                type: 1,
+                                displayName: {
+                                    $cond: [
+                                        { $eq: ["$type", enums_1.ChatEnum.OVM] },
+                                        "$groupName",
+                                        {
+                                            $concat: [
+                                                { $ifNull: ["$otherParticipant.firstName", ""] },
+                                                " ",
+                                                { $ifNull: ["$otherParticipant.lastName", ""] },
+                                            ],
+                                        },
+                                    ],
+                                },
+                                displayImage: {
+                                    $cond: [
+                                        { $eq: ["$type", enums_1.ChatEnum.OVM] },
+                                        "$groupIcon",
+                                        "$otherParticipant.profilePicture",
+                                    ],
+                                },
+                                lastMessage: {
+                                    content: {
+                                        $cond: [
+                                            { $ifNull: ["$lastMessage.deletedAt", false] },
+                                            "This message was deleted",
+                                            "$lastMessage.content",
+                                        ],
+                                    },
+                                    hasAttachment: {
+                                        $cond: [
+                                            { $ifNull: ["$lastMessage.deletedAt", false] },
+                                            false,
+                                            { $gt: [{ $size: { $ifNull: ["$lastMessage.files", []] } }, 0] },
+                                        ],
+                                    },
+                                    createdAt: "$lastMessage.createdAt",
+                                },
+                            },
+                        },
+                    ],
+                    totalCount: [{ $count: "count" }],
+                },
+            },
+        ];
+        const result = await this.chatRepository.aggregate(pipeline);
+        const docs = result[0]?.data || [];
+        const total = result[0]?.totalCount?.[0]?.count || 0;
+        return {
+            docs,
+            currentPage: page,
+            pageSize: size,
+            pages: Math.ceil(total / size),
+        };
+    }
 }
 exports.ChatService = ChatService;
 exports.chatService = new ChatService();

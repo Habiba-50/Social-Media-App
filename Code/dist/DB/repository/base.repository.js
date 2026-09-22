@@ -97,5 +97,8 @@ class DatabaseRepository {
     async deleteById({ _id }) {
         return await this.model.deleteOne({ _id });
     }
+    async aggregate(pipeline) {
+        return await this.model.aggregate(pipeline);
+    }
 }
 exports.DatabaseRepository = DatabaseRepository;

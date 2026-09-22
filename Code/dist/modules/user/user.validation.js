@@ -11,6 +11,6 @@ exports.profileGQL = zod_1.default.strictObject({
 });
 exports.searchUserValidation = {
     query: validation_1.paginationValidationSchema.query.extend({
-        search: zod_1.default.string().max(10, "Search query must be less than 100 character").optional(),
+        search: zod_1.default.string().min(1, "Search query must be at least 1 character long").max(10, "Search query must be less than 100 character").optional(),
     })
 };

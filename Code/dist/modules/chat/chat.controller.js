@@ -18,4 +18,9 @@ router.post("/group", (0, middleware_1.authentication)(), (0, multer_1.cloudFile
     const data = await chat_service_1.chatService.createGroupChat(req.body, req.user, req.file);
     return (0, response_1.successResponse)({ res, statusCode: 200, data });
 });
+router.get("/my-chats", (0, middleware_1.authentication)(), async (req, res, next) => {
+    const data = await chat_service_1.chatService.getMyChats(req.user, { page: Number(req.query.page),
+        size: Number(req.query.size) });
+    return (0, response_1.successResponse)({ res, statusCode: 200, data });
+});
 exports.default = router;

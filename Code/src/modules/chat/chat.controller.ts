@@ -51,6 +51,19 @@ router.post(
     }
 )
 
+// -------------------------------- Get My Chats----------------------------------------------
+router.get(
+    "/my-chats",
+    authentication(),
+    async (req: Request, res: Response, next: NextFunction) => {
+        const data = await chatService.getMyChats(
+            req.user,
+            { page : Number(req.query.page),
+            size : Number(req.query.size)}
+        );
+        return successResponse({ res, statusCode: 200, data });
+    }
+)
 
 
 export default router;

@@ -17,6 +17,7 @@ const router = Router();
 
 //  Routes
 router.use("/:userId/chat", chatRouter);
+router.use("/chat", chatRouter);
 
 // -------------------------------- Get Profile----------------------------------------------
 
@@ -167,7 +168,12 @@ router.get("/searchUser",
     validation(validators.searchUserValidation),
     async (req: Request, res: Response, next: NextFunction) => {
         const {search , page , size} = req.query;
-        const data = await userService.searchUsers(req.user , {search:search as string , page:Number(page) , size:Number(size)})
+        const data = await userService.searchUsers(
+            req.user, {
+            search: search as string,
+            page: page ? Number(page) : 1,
+            size: size ? Number(size) : 10
+        })
         return successResponse({res , statusCode:200 , data})
     }
 )

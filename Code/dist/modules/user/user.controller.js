@@ -47,6 +47,7 @@ const chat_1 = require("../chat");
 const validators = __importStar(require("./user.validation"));
 const router = (0, express_1.Router)();
 router.use("/:userId/chat", chat_1.chatRouter);
+router.use("/chat", chat_1.chatRouter);
 router.get("/", (0, middleware_1.authentication)(), (0, middleware_1.authorization)(user_authorization_1.userAuthorization.profile), async (req, res, next) => {
     const data = await user_service_1.default.profile(req.user);
     return (0, response_1.successResponse)({ res, statusCode: 200, data });
@@ -105,7 +106,11 @@ router.delete("/destroy/:userId/{permanent}", (0, middleware_1.authentication)()
 });
 router.get("/searchUser", (0, middleware_1.authentication)(), (0, middleware_1.validation)(validators.searchUserValidation), async (req, res, next) => {
     const { search, page, size } = req.query;
-    const data = await user_service_1.default.searchUsers(req.user, { search: search, page: Number(page), size: Number(size) });
+    const data = await user_service_1.default.searchUsers(req.user, {
+        search: search,
+        page: page ? Number(page) : 1,
+        size: size ? Number(size) : 10
+    });
     return (0, response_1.successResponse)({ res, statusCode: 200, data });
 });
 exports.default = router;

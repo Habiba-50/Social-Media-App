@@ -9,4 +9,5 @@ export enum NotificationType {
     FOLLOW = "FOLLOW",
     FRIEND_REQUEST = "FRIEND_REQUEST",
     REPOST = "REPOST",
+    GROUP_ADD = "GROUP_ADD",
 }
