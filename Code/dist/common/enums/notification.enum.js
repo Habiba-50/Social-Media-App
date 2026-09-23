@@ -13,4 +13,5 @@ var NotificationType;
     NotificationType["FOLLOW"] = "FOLLOW";
     NotificationType["FRIEND_REQUEST"] = "FRIEND_REQUEST";
     NotificationType["REPOST"] = "REPOST";
+    NotificationType["GROUP_ADD"] = "GROUP_ADD";
 })(NotificationType || (exports.NotificationType = NotificationType = {}));

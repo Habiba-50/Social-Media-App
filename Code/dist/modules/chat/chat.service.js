@@ -9,16 +9,38 @@ const user_repository_1 = require("../../DB/repository/user.repository");
 const services_1 = require("../../common/services");
 const node_crypto_1 = require("node:crypto");
 const friendRequest_1 = require("../friendRequest");
+const notification_1 = require("../notification");
+const block_1 = require("../block");
 class ChatService {
     chatRepository;
     userRepository;
     s3Service;
     friendRequestService;
+    redisService;
+    notificationModuleService;
+    notificationService;
+    blockService;
     constructor() {
         this.chatRepository = new chat_repository_1.ChatRepository();
         this.userRepository = new user_repository_1.UserRepository();
         this.s3Service = services_1.s3Service;
         this.friendRequestService = friendRequest_1.friendRequestService;
+        this.notificationService = new services_1.NotificationService();
+        this.notificationModuleService = new notification_1.NotificationModuleService();
+        this.redisService = new services_1.RedisService();
+        this.blockService = new block_1.BlockService();
+    }
+    async checkExistingChat(chatId) {
+        const chat = await this.chatRepository.findOne({
+            filter: { _id: chatId, deletedAt: { $exists: false } }
+        });
+        if (!chat) {
+            throw new exceptions_1.NotFoundException("Chat is not exist");
+        }
+        if (chat.type !== enums_1.ChatEnum.OVM) {
+            throw new exceptions_1.BadRequestException("Chat is not a group chat");
+        }
+        return chat;
     }
     async getChat(participantId, { page, size } = {}, user) {
         const chat = await this.chatRepository.findOneChat({
@@ -127,10 +149,11 @@ class ChatService {
                 populate: [
                     {
                         path: "participants",
-                        select: "username profilePicture"
+                        select: "firstName lastName username profilePicture"
                     },
                     {
                         path: "messages.createdBy",
+                        select: "firstName lastName username profilePicture"
                     }
                 ]
             },
@@ -138,6 +161,9 @@ class ChatService {
             size
         });
         if (!chat) {
+            throw new exceptions_1.NotFoundException("Chat not found");
+        }
+        if (chat?.deletedAt) {
             throw new exceptions_1.NotFoundException("Chat not found");
         }
         return chat;
@@ -281,6 +307,170 @@ class ChatService {
             pageSize: size,
             pages: Math.ceil(total / size),
         };
+    }
+    async addMembersToGroupChat(userId, chatId, memberIds) {
+        const chat = await this.checkExistingChat(chatId);
+        if (!chat.participants.includes(userId) || userId.toString() !== chat.createdBy.toString()) {
+            throw new exceptions_1.ForbiddenException("You are not authorized to add members to this chat");
+        }
+        const existingUserIds = chat.participants.map((p) => p.toString());
+        const newMemberIds = [...new Set(memberIds)]
+            .filter((id) => !existingUserIds.includes(id))
+            .map((id) => (0, objectId_1.toObjectId)(id));
+        if (newMemberIds.length === 0) {
+            return chat;
+        }
+        const existingNewMembers = await this.userRepository.findAll({
+            filter: { _id: { $in: newMemberIds }, deletedAt: { $exists: false } }
+        });
+        if (existingNewMembers?.length !== newMemberIds.length) {
+            throw new exceptions_1.NotFoundException("Some users no longer exist");
+        }
+        const friendIds = await this.friendRequestService.getAcceptedFriendIds(userId);
+        const friendIdSet = new Set(friendIds.map((id) => id.toString()));
+        const allAreFriends = newMemberIds.every((id) => friendIdSet.has(id.toString()));
+        if (!allAreFriends) {
+            throw new exceptions_1.BadRequestException("Some users are not your friends");
+        }
+        const blockedIds = await this.blockService.getBlockedUserIds(userId);
+        const blockedIdSet = new Set(blockedIds.map((id) => id.toString()));
+        const noneBlocked = newMemberIds.every((id) => !blockedIdSet.has(id.toString()));
+        if (!noneBlocked) {
+            throw new exceptions_1.BadRequestException("Some users cannot be added to this chat");
+        }
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { $push: { participants: { $each: newMemberIds } } },
+            options: { new: true }
+        });
+        if (!updatedChat) {
+            throw new exceptions_1.BadRequestException("Failed to add members");
+        }
+        for (const memberId of newMemberIds) {
+            try {
+                await this.notificationModuleService.createNotification({
+                    title: "Added to group",
+                    body: `You were added to ${chat.groupName}`,
+                    senderId: userId,
+                    receiverId: memberId,
+                    type: enums_1.NotificationType.GROUP_ADD,
+                    onModel: "Chat",
+                    referenceId: chat._id,
+                });
+            }
+            catch (error) {
+                console.log("Failed to create notification:", error);
+            }
+            const tokens = await this.redisService.getFCMs(memberId);
+            if (tokens?.length) {
+                try {
+                    await this.notificationService.sendNotifications({
+                        userId: memberId,
+                        tokens,
+                        title: "Added to group",
+                        body: `You were added to ${chat.groupName}`,
+                        entityId: chat._id.toString(),
+                        entityType: "chat",
+                        senderId: userId.toString(),
+                        type: enums_1.NotificationType.GROUP_ADD,
+                    });
+                }
+                catch (error) {
+                    console.log("Failed to send notification:", error);
+                }
+            }
+        }
+        return updatedChat;
+    }
+    async removeMemberFromGroupChat(userId, chatId, memberId) {
+        const chat = await this.checkExistingChat(chatId);
+        const participantIds = chat.participants.map(p => p.toString());
+        if (!participantIds.includes(userId.toString()) || userId.toString() !== chat.createdBy.toString()) {
+            throw new exceptions_1.ForbiddenException("You are not authorized to remove members from this chat");
+        }
+        if (!participantIds.includes(memberId.toString())) {
+            throw new exceptions_1.BadRequestException("This user is not a participant in this chat");
+        }
+        if (memberId.toString() === chat.createdBy.toString()) {
+            throw new exceptions_1.BadRequestException("You cannot remove the admin from the chat");
+        }
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { $pull: { participants: memberId } },
+            options: { new: true }
+        });
+        if (!updatedChat) {
+            throw new exceptions_1.BadRequestException("Failed to remove member");
+        }
+        return updatedChat;
+    }
+    async leaveGroupChat(userId, chatId) {
+        const chat = await this.checkExistingChat(chatId);
+        const participantIds = chat.participants.map(p => p.toString());
+        if (!participantIds.includes(userId.toString())) {
+            throw new exceptions_1.ForbiddenException("You are not authorized to leave this chat");
+        }
+        if (userId.toString() === chat.createdBy.toString()) {
+            throw new exceptions_1.ForbiddenException("Admin cannot leave the group. Delete the group instead.");
+        }
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { $pull: { participants: userId } },
+            options: { new: true }
+        });
+        if (!updatedChat) {
+            throw new exceptions_1.BadRequestException("Failed to leave chat");
+        }
+        return updatedChat;
+    }
+    async deleteGroupChat(userId, chatId) {
+        const chat = await this.checkExistingChat(chatId);
+        if (userId.toString() !== chat.createdBy.toString()) {
+            throw new exceptions_1.ForbiddenException("Only admin can delete the group.");
+        }
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { deletedAt: new Date() },
+            options: { new: true }
+        });
+        if (!updatedChat) {
+            throw new exceptions_1.BadRequestException("Failed to delete group");
+        }
+        return updatedChat;
+    }
+    async editGroupChat(userId, chatId, updates, file) {
+        const chat = await this.checkExistingChat(chatId);
+        if (userId.toString() !== chat.createdBy.toString()) {
+            throw new exceptions_1.ForbiddenException("Only admin can edit the group.");
+        }
+        const { groupName, groupDescription } = updates;
+        if (!groupName && !groupDescription && !file) {
+            throw new exceptions_1.BadRequestException("Nothing to update");
+        }
+        let groupIcon;
+        if (file) {
+            const path = `chat/group/${chat.roomId}`;
+            groupIcon = await this.s3Service.uploadAsset({ path, file });
+            if (chat.groupIcon && chat.groupIcon !== groupIcon) {
+                await this.s3Service.deleteAsset({ Key: chat.groupIcon });
+            }
+        }
+        const updateData = {};
+        if (groupName)
+            updateData.groupName = groupName;
+        if (groupDescription)
+            updateData.groupDescription = groupDescription;
+        if (groupIcon)
+            updateData.groupIcon = groupIcon;
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: updateData,
+            options: { new: true }
+        });
+        if (!updatedChat) {
+            throw new exceptions_1.BadRequestException("Failed to edit group");
+        }
+        return updatedChat;
     }
 }
 exports.ChatService = ChatService;

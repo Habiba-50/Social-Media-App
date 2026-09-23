@@ -33,6 +33,25 @@ export class ChatService {
         this.blockService = new BlockService()
     }
 
+    // ---------------------------- Check Chat Exisiting----------------------
+
+    private async checkExistingChat(chatId:Types.ObjectId): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
+        // 1️⃣ Chat must exist
+        const chat = await this.chatRepository.findOne({
+            filter: { _id: chatId, deletedAt: { $exists: false } }
+        });
+
+        if (!chat) {
+            throw new NotFoundException("Chat is not exist");
+        }
+
+        // 2️⃣ Must be a group chat
+        if (chat.type !== ChatEnum.OVM) {
+            throw new BadRequestException("Chat is not a group chat");
+        }
+        return chat
+    }
+
     // --------------------------- Get Chat -----------------------------------
 
     async getChat(participantId: string, { page, size }: { page?: string; size?: string } = {}, user: HydratedDocument<IUser>): Promise<IChat | undefined> {
@@ -190,10 +209,11 @@ export class ChatService {
                 populate: [
                     {
                         path: "participants",
-                        select: "username profilePicture"
+                        select: "firstName lastName username profilePicture"
                     },
                     {
                         path: "messages.createdBy",
+                        select: "firstName lastName username profilePicture"
                     }
                 ]
             },
@@ -208,13 +228,13 @@ export class ChatService {
             throw new NotFoundException("Chat not found")
         }
 
+        // Deleted Group
+        if (chat?.deletedAt) {
+            throw new NotFoundException("Chat not found")
+        }
+
         return chat
     }
-
-
-    // -------------------------- Update Group Chat -----------------------------------
-
-
 
 
     // ----------------------------- Send Group Message -----------------------------------
@@ -391,36 +411,25 @@ export class ChatService {
         };
     }
 
-    // ------------------------------ Add Memder to Group Chat -----------------------------------
+    // ------------------------------ Add Member to Group Chat -----------------------------------
 
     async addMembersToGroupChat(
         userId: Types.ObjectId,
         chatId: Types.ObjectId,
-        memberIds: Types.ObjectId[]
+        memberIds: string[]
     ): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
 
         // 1️⃣ Chat must exist
-        const chat = await this.chatRepository.findOne({
-            filter: { _id: chatId, deletedAt: { $exists: false } }
-        });
+        const chat = await this.checkExistingChat(chatId)
 
-        if (!chat) {
-            throw new NotFoundException("Chat not found");
-        }
-
-        // 2️⃣ Must be a group chat
-        if (chat.type !== ChatEnum.OVM) {
-            throw new BadRequestException("Chat is not a group chat");
-        }
-
-        // 3️⃣ User is a patricipant & Only admin can add members
+        // 2️⃣ User is a patricipant & Only admin can add members
         if (!chat.participants.includes(userId) || userId.toString() !== chat.createdBy.toString()) {
             throw new ForbiddenException("You are not authorized to add members to this chat");
         }
 
-        // 4️⃣ Exclude existing members + duplicates in the input
+        // 3️⃣ Exclude existing members + duplicates in the input
         const existingUserIds = chat.participants.map((p) => p.toString());
-        const newMemberIds = [...new Set(memberIds.map((id) => id.toString()))]
+        const newMemberIds = [...new Set(memberIds)]
             .filter((id) => !existingUserIds.includes(id))
             .map((id) => toObjectId(id));
 
@@ -428,7 +437,7 @@ export class ChatService {
             return chat as HydratedDocument<IChat> & { _id: Types.ObjectId };
         }
 
-        // 5️⃣ Ensure new members are valid users
+        // 4️⃣ Ensure new members are valid users
         const existingNewMembers = await this.userRepository.findAll({
             filter: { _id: { $in: newMemberIds }, deletedAt: { $exists: false } }
         });
@@ -437,7 +446,7 @@ export class ChatService {
             throw new NotFoundException("Some users no longer exist");
         }
 
-        // 6️⃣ Ensure all new members are friends with admin
+        // 5️⃣ Ensure all new members are friends with admin
         const friendIds = await this.friendRequestService.getAcceptedFriendIds(userId);
         const friendIdSet = new Set(friendIds.map((id) => id.toString()));
 
@@ -446,7 +455,7 @@ export class ChatService {
             throw new BadRequestException("Some users are not your friends");
         }
 
-        // 7️⃣ Ensure no blocking between admin and any new member
+        // 6️⃣ Ensure no blocking between admin and any new member
         const blockedIds = await this.blockService.getBlockedUserIds(userId);
         const blockedIdSet = new Set(blockedIds.map((id) => id.toString()));
 
@@ -455,7 +464,7 @@ export class ChatService {
             throw new BadRequestException("Some users cannot be added to this chat");
         }
 
-        // 8️⃣ Update chat by adding new members
+        // 7️⃣ Update chat by adding new members
         const updatedChat = await this.chatRepository.findOneAndUpdate({
             filter: { _id: chatId },
             update: { $push: { participants: { $each: newMemberIds } } },
@@ -466,7 +475,7 @@ export class ChatService {
             throw new BadRequestException("Failed to add members");
         }
 
-        // 9️⃣ Notification to each new member that they were added to the group
+        // 8️⃣ Notification to each new member that they were added to the group
         for (const memberId of newMemberIds) {
             try {
                 await this.notificationModuleService.createNotification({
@@ -504,16 +513,174 @@ export class ChatService {
         return updatedChat as HydratedDocument<IChat> & { _id: Types.ObjectId };
     }
 
-    // ------------------------------ Remove Memder from Group Chat -----------------------------------
+    // ------------------------------ Remove Member from Group Chat -----------------------------------
+
+    async removeMemberFromGroupChat(
+        userId: Types.ObjectId,
+        chatId: Types.ObjectId,
+        memberId: Types.ObjectId
+    ): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
+
+        // 1️⃣ Chat must exist
+        const chat = await this.checkExistingChat(chatId)
+
+        const participantIds = chat.participants.map(p => p.toString());
+
+        // 2️⃣ User is a patricipant & Only admin can add members
+        if (!participantIds.includes(userId.toString()) || userId.toString() !== chat.createdBy.toString()) {
+            throw new ForbiddenException("You are not authorized to remove members from this chat");
+        }
+
+        // 3️⃣ Check this member is a participant
+        if (!participantIds.includes(memberId.toString())) {
+            throw new BadRequestException("This user is not a participant in this chat");
+        }
+
+        // 4️⃣ Ensure the user is not the admin
+        if (memberId.toString() === chat.createdBy.toString()) {
+            throw new BadRequestException("You cannot remove the admin from the chat");
+        }
+
+        // 5️⃣ Update chat by removing the member
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { $pull: { participants: memberId } },
+            options: { new: true }
+        });
+
+        if (!updatedChat) {
+            throw new BadRequestException("Failed to remove member");
+        }
 
 
+        return updatedChat as HydratedDocument<IChat> & { _id: Types.ObjectId };
+    }
 
     // -------------------------- Leave Group Chat (Only for participants) -----------------------------------
 
+    async leaveGroupChat(
+        userId: Types.ObjectId,
+        chatId: Types.ObjectId,
+    ): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
 
+        // 1️⃣ Chat must exist
+        const chat = await this.checkExistingChat(chatId)
+
+        const participantIds = chat.participants.map(p => p.toString());
+
+        // 2️⃣ User is a patricipant
+        if (!participantIds.includes(userId.toString())) {
+            throw new ForbiddenException("You are not authorized to leave this chat");
+        }
+
+        // 3️⃣ Admin can't leave
+        if (userId.toString() === chat.createdBy.toString()) {
+            throw new ForbiddenException("Admin cannot leave the group. Delete the group instead.");
+        }
+
+        // 4️⃣ Update chat by removing the member
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { $pull: { participants: userId } },
+            options: { new: true }
+        });
+
+        if (!updatedChat) {
+            throw new BadRequestException("Failed to leave chat");
+        }
+
+
+        return updatedChat as HydratedDocument<IChat> & { _id: Types.ObjectId };
+    }
 
     // ------------------------------ Delete the group (Admin only) -----------------------------------
 
+    async deleteGroupChat(
+        userId: Types.ObjectId,
+        chatId: Types.ObjectId,
+    ): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
+
+        // 1️⃣ Chat must exist
+        const chat = await this.checkExistingChat(chatId)
+
+        // 2️⃣ User is admin
+        if (userId.toString() !== chat.createdBy.toString()) {
+            throw new ForbiddenException("Only admin can delete the group.");
+        }
+
+        // 3️⃣ Update chat by soft deleting it
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: { deletedAt: new Date() },
+            options: { new: true }
+        });
+
+        if (!updatedChat) {
+            throw new BadRequestException("Failed to delete group");
+        }
+
+
+        return updatedChat as HydratedDocument<IChat> & { _id: Types.ObjectId };
+    }
+
+    // ------------------------------ Edit the group (Admin only) -----------------------------------
+
+    async editGroupChat(
+        userId: Types.ObjectId,
+        chatId: Types.ObjectId,
+        updates: {
+            groupName?: string;
+            groupDescription?: string;
+        },
+        file?: Express.Multer.File
+    ): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
+
+        // 1️⃣ Chat must exist
+        const chat = await this.checkExistingChat(chatId)
+
+        // 2️⃣ User is admin
+        if (userId.toString() !== chat.createdBy.toString()) {
+            throw new ForbiddenException("Only admin can edit the group.");
+        }
+
+        const { groupName, groupDescription } = updates;
+
+        // 3️⃣  Must have at least one update (text or image)
+        if (!groupName && !groupDescription && !file) {
+            throw new BadRequestException("Nothing to update");
+        }
+
+        // 4️⃣ Upload the new image if provided
+        let groupIcon: string | undefined;
+        if (file) {
+            const path = `chat/group/${chat.roomId}`;
+            groupIcon = await this.s3Service.uploadAsset({ path, file });
+
+            // Delete the old image from S3 if it exists
+            if (chat.groupIcon && chat.groupIcon !== groupIcon) {
+                await this.s3Service.deleteAsset({ Key: chat.groupIcon });
+            }
+        }
+
+        // 5️⃣ Build update object with only the new inputs
+        const updateData: Record<string, string> = {};
+        if (groupName) updateData.groupName = groupName;
+        if (groupDescription) updateData.groupDescription = groupDescription;
+        if (groupIcon) updateData.groupIcon = groupIcon;
+
+        // 6️⃣ Update the chat
+        const updatedChat = await this.chatRepository.findOneAndUpdate({
+            filter: { _id: chatId },
+            update: updateData,
+            options: { new: true }
+        });
+
+        if (!updatedChat) {
+            throw new BadRequestException("Failed to edit group");
+        }
+
+        return updatedChat as HydratedDocument<IChat> & { _id: Types.ObjectId };
+    }
 
 }
 
