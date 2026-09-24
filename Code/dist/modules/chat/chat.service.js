@@ -42,6 +42,15 @@ class ChatService {
         }
         return chat;
     }
+    async checkChatExists(chatId) {
+        const chat = await this.chatRepository.findOne({
+            filter: { _id: chatId, deletedAt: { $exists: false } }
+        });
+        if (!chat) {
+            throw new exceptions_1.NotFoundException("Chat not found");
+        }
+        return chat;
+    }
     async getChat(participantId, { page, size } = {}, user) {
         const chat = await this.chatRepository.findOneChat({
             filter: {
@@ -96,6 +105,51 @@ class ChatService {
                 }
             });
         }
+    }
+    async editMessage({ chatId, messageId, content }, user) {
+        await this.checkChatExists((0, objectId_1.toObjectId)(chatId));
+        const chat = await this.chatRepository.findOneAndUpdate({
+            filter: {
+                _id: (0, objectId_1.toObjectId)(chatId),
+                "messages._id": (0, objectId_1.toObjectId)(messageId),
+                "messages.createdBy": user._id
+            },
+            update: {
+                $set: {
+                    "messages.$.content": content,
+                    "messages.$.updatedAt": Date.now(),
+                }
+            },
+            options: {
+                new: true,
+            }
+        });
+        if (!chat) {
+            throw new exceptions_1.NotFoundException("Message not found");
+        }
+        return chat;
+    }
+    async deleteMessage({ chatId, messageId }, user) {
+        await this.checkChatExists((0, objectId_1.toObjectId)(chatId));
+        const chat = await this.chatRepository.findOneAndUpdate({
+            filter: {
+                _id: (0, objectId_1.toObjectId)(chatId),
+                "messages._id": (0, objectId_1.toObjectId)(messageId),
+                "messages.createdBy": user._id
+            },
+            update: {
+                $set: {
+                    "messages.$.deletedAt": Date.now(),
+                }
+            },
+            options: {
+                new: true,
+            }
+        });
+        if (!chat) {
+            throw new exceptions_1.NotFoundException("Message not found");
+        }
+        return chat;
     }
     async createGroupChat(body, user, file) {
         const participantsIds = [...new Set(body.participantsIds.map((id) => (0, objectId_1.toObjectId)(id)))];
@@ -348,6 +402,7 @@ class ChatService {
         }
         for (const memberId of newMemberIds) {
             try {
+                console.log("hellooo");
                 await this.notificationModuleService.createNotification({
                     title: "Added to group",
                     body: `You were added to ${chat.groupName}`,

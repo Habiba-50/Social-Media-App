@@ -35,6 +35,7 @@ export class ChatService {
 
     // ---------------------------- Check Chat Exisiting----------------------
 
+    //Group
     private async checkExistingChat(chatId:Types.ObjectId): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
         // 1️⃣ Chat must exist
         const chat = await this.chatRepository.findOne({
@@ -50,6 +51,17 @@ export class ChatService {
             throw new BadRequestException("Chat is not a group chat");
         }
         return chat
+    }
+
+    // Chat
+    private async checkChatExists(chatId: Types.ObjectId): Promise<HydratedDocument<IChat> & { _id: Types.ObjectId }> {
+        const chat = await this.chatRepository.findOne({
+            filter: { _id: chatId, deletedAt: { $exists: false } }
+        });
+        if (!chat) {
+            throw new NotFoundException("Chat not found");
+        }
+        return chat;
     }
 
     // --------------------------- Get Chat -----------------------------------
@@ -131,6 +143,60 @@ export class ChatService {
         }
 
     }
+
+    // --------------------------- Edit Message -----------------------------------
+
+    async editMessage({ chatId, messageId, content }: { chatId: string, messageId: string, content: string }, user: HydratedDocument<IUser>): Promise<void | IChat> {
+        await this.checkChatExists(toObjectId(chatId))
+        const chat = await this.chatRepository.findOneAndUpdate({
+            filter: {
+                _id: toObjectId(chatId),
+                "messages._id": toObjectId(messageId),
+                "messages.createdBy": user._id
+            },
+            update: {
+                $set: {
+                    "messages.$.content": content,
+                    "messages.$.updatedAt": Date.now(),
+                }
+            },
+            options:{
+                new: true,
+            }
+        })
+        if (!chat) {
+            throw new NotFoundException("Message not found")
+        }
+        
+        return chat
+    }
+
+    // ---------------------------  Delete Message -----------------------------------
+
+    async deleteMessage({ chatId, messageId }: { chatId: string, messageId: string }, user: HydratedDocument<IUser>): Promise<void | IChat> {
+        await this.checkChatExists(toObjectId(chatId))
+        const chat = await this.chatRepository.findOneAndUpdate({
+            filter: {
+                _id: toObjectId(chatId),
+                "messages._id": toObjectId(messageId),
+                "messages.createdBy": user._id
+            },
+            update: {
+                $set: {
+                    "messages.$.deletedAt": Date.now(),
+                }
+            },
+            options: {
+                new: true,
+            }
+        })
+        if (!chat) {
+            throw new NotFoundException("Message not found")
+        }
+
+        return chat
+    }
+
 
     // --------------------------- Create Group Chat -----------------------------------
     async createGroupChat(body: { groupName: string, participantsIds: string[] | Types.ObjectId[] }, user: HydratedDocument<IUser>, file?: Express.Multer.File,): Promise<IChat | undefined> {
@@ -478,6 +544,7 @@ export class ChatService {
         // 8️⃣ Notification to each new member that they were added to the group
         for (const memberId of newMemberIds) {
             try {
+                console.log("hellooo")
                 await this.notificationModuleService.createNotification({
                     title: "Added to group",
                     body: `You were added to ${chat.groupName}`,

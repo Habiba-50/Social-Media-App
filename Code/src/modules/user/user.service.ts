@@ -2,12 +2,13 @@ import { HydratedDocument, Types } from "mongoose";
 import { IPaginate, IUser } from "../../common/interfaces";
 import { JwtPayload } from "jsonwebtoken";
 import { ACCESS_TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY } from "../../config/config";
-import { BadRequestException, conflictException } from "../../common/exceptions";
+import { BadRequestException, conflictException, NotFoundException } from "../../common/exceptions";
 import { RedisService, S3Service, TokenService } from "../../common/services";
 import { ChatEnum, LogoutEnum, StorageApproachEnum, UploadApproachEnum } from "../../common/enums";
 import { UserRepository } from "../../DB/repository";
 import { ChatRepository } from "../../DB/repository/chat.repository";
 import { BlockService } from "../block/block.service";
+import { toObjectId } from "../../common/utils/objectId";
 
 
 
@@ -56,6 +57,28 @@ export class UserService {
     })
     
     return { user: profile as IUser, groups };
+  }
+
+  // ------------------------------------ Get Profile By Id -----------------------------------------------
+
+  public async profileById( id: string): Promise<{ user: IUser }> {
+
+    // Populate friends 
+    const profile = await this.userRepository.findById(toObjectId(id))
+    if (!profile) {
+      throw new NotFoundException("User not found")
+    }
+    // const groups = await this.chatRepository.findAll({
+    //   filter: { participants: { $in: [toObjectId(id)] }, type: ChatEnum.OVM },
+    //   options: {
+    //     populate: {
+    //       path: "participants",
+    //       model: "User"
+    //     }
+    //   }
+    // })
+
+    return { user: profile as IUser };
   }
 
   // ------------------------------------ Rotate Token -----------------------------------------------

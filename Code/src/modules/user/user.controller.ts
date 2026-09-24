@@ -31,6 +31,16 @@ router.get("/",
 )
 
 
+// --------------------------------Get Profile By Id----------------------------------------------
+
+router.get("/:userId",
+    authentication(),
+    async (req: Request, res: Response , next : NextFunction) => {
+        const data = await userService.profileById(req.params?.userId as string)
+        return successResponse({ res, statusCode: 200, data })
+    }
+)
+
 // --------------------------------Rotate Token----------------------------------------------
 
 router.post(
