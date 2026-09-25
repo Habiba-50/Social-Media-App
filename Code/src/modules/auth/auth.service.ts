@@ -1,6 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 import { EmailEnum, NotificationType, ProviderEnum } from "../../common/enums";
-import {  conflictException, NotFoundException } from "../../common/exceptions";
+import { conflictException, NotFoundException } from "../../common/exceptions";
 import { NotificationService, RedisService, redisService, TokenService } from "../../common/services";
 import { createNumberOtp } from "../../common/utils";
 import { emailEmitter, emailTemplate, sendEmail } from "../../common/utils/email";
@@ -8,20 +8,20 @@ import { compareHash, generateHash } from "../../common/utils/security";
 import { UserRepository } from "../../DB/repository";
 import { LoginDto, SignupDto } from "./auth.dto";
 import { WEB_CLIENT_ID } from "../../config/config";
-import {  NotificationModuleService } from "../notification";
+import { NotificationModuleService } from "../notification";
 
 
-class AuthenticationService{
+class AuthenticationService {
 
     private userRepository: UserRepository;
     private redis: RedisService;
     private tokenService: TokenService;
     private notificationService: NotificationService;
-    private notificationServiceModule:NotificationModuleService;
-  
-    
+    private notificationServiceModule: NotificationModuleService;
 
-    constructor() { 
+
+
+    constructor() {
         this.userRepository = new UserRepository()
         this.redis = redisService
         this.tokenService = new TokenService()
@@ -37,10 +37,10 @@ class AuthenticationService{
 
     // -----------------------------Send Email OTP-----------------------------
 
-    
-    private async sendEmailOtp (email:string, subject: EmailEnum = EmailEnum.ConfirmEmail, title :string) : Promise<void> {
 
-    // Check Block Condition
+    private async sendEmailOtp(email: string, subject: EmailEnum = EmailEnum.ConfirmEmail, title: string): Promise<void> {
+
+        // Check Block Condition
         const isBlocked = await this.redis.get(this.redis.blockOtpKey({ email, subject }));
         if (isBlocked) {
             const remainingTime = await this.redis.ttl(this.redis.blockOtpKey({ email, subject }));
@@ -49,7 +49,7 @@ class AuthenticationService{
             }
         }
 
-    // Check Max Trials
+        // Check Max Trials
         const maxTrialCount = await this.redis.get(this.redis.maxRequestOtpKey({ email, subject }));
         if (maxTrialCount >= 3) {
             await this.redis.set({
@@ -60,18 +60,26 @@ class AuthenticationService{
             throw new conflictException(`You have reached max request trial count please try again later after 5 minutes`);
         }
 
+        // check there is a valid otp
+        const existingOtp = await this.redis.get(this.redis.otpKey({ email, subject }));
+        if (existingOtp) {
+            const remainingTime = await this.redis.ttl(this.redis.otpKey({ email, subject }));
+            if (remainingTime > 0) {
+                throw new conflictException(`OTP already sent, please try again after ${remainingTime} seconds`);
+            }
+        }
 
-    // Generate and Set OTP 
+        // Generate and Set OTP 
         const code = await createNumberOtp();
 
         await this.redis.set({
             key: this.redis.otpKey({ email, subject }),
-            value: await generateHash({plaintext: `${code}`}),
+            value: await generateHash({ plaintext: `${code}` }),
             ttl: 120,
         });
 
 
-     // Send Email
+        // Send Email
         await sendEmail({
             to: email,
             subject: title,
@@ -79,7 +87,7 @@ class AuthenticationService{
         });
 
 
-    // Increment Trials Count
+        // Increment Trials Count
         maxTrialCount > 0 ?
             await this.redis.increment(this.redis.maxRequestOtpKey({ email, subject }))
             : await this.redis.set({ key: this.redis.maxRequestOtpKey({ email, subject }), value: 1, ttl: 300 })
@@ -129,13 +137,13 @@ class AuthenticationService{
 
     // ----------------------------Confirm Email--------------------------------
 
-    public async confirmEmail ({email , otp}:{ email : string, otp : number }) : Promise<void> {
+    public async confirmEmail({ email, otp }: { email: string, otp: number }): Promise<void> {
 
         const account = await this.userRepository.findOne({
-            filter: { email , confirmEmail: { $exists: false } , provider: ProviderEnum.SYSTEM },
+            filter: { email, confirmEmail: { $exists: false }, provider: ProviderEnum.SYSTEM },
         });
 
-        
+
 
         if (!account) {
             throw new NotFoundException("Invalid Account");
@@ -161,7 +169,7 @@ class AuthenticationService{
 
     // ----------------------------Resend OTP--------------------------------
 
-    public async resendOtp ({email} : {email : string}) : Promise<void> {
+    public async resendOtp({ email }: { email: string }): Promise<void> {
 
         const user = await this.userRepository.findOne({
             filter: { email, provider: ProviderEnum.SYSTEM },
@@ -188,7 +196,7 @@ class AuthenticationService{
 
     // -----------------------------Verify google account --------------------------------
 
-    private async verifyGoogleAccount (idToken : string) : Promise<any> {
+    private async verifyGoogleAccount(idToken: string): Promise<any> {
         const client = new OAuth2Client();
 
         const ticket = await client.verifyIdToken({
@@ -207,7 +215,7 @@ class AuthenticationService{
 
     // ----------------------------Signup Gmail--------------------------------
 
-    public async signupGmail (idToken : string, issuer : string) : Promise<any> {
+    public async signupGmail(idToken: string, issuer: string): Promise<any> {
 
         const payload = await this.verifyGoogleAccount(idToken)
 
@@ -227,7 +235,7 @@ class AuthenticationService{
             if (checkUser.provider !== ProviderEnum.GOOGLE) {
                 throw new conflictException("Account already exists with different provider");
             } else {
-                const account = await this.loginGmail(idToken , issuer);
+                const account = await this.loginGmail(idToken, issuer);
                 return { account, status: 200 }
             }
 
@@ -251,9 +259,9 @@ class AuthenticationService{
 
     // ----------------------------Login--------------------------------
 
-    public async login (inputs: LoginDto , issuer:string ) : Promise<{access_token : string , refresh_token : string}> {
+    public async login(inputs: LoginDto, issuer: string): Promise<{ access_token: string, refresh_token: string }> {
 
-        const {email , password , fcm} = inputs
+        const { email, password, fcm } = inputs
         const user = await this.userRepository.findOne({
             filter: { email, provider: ProviderEnum.SYSTEM },
         });
@@ -311,7 +319,7 @@ class AuthenticationService{
 
         const credentials = await this.tokenService.createLoginCredentials({ user, issuer });
         // console.log("Credentials: ", credentials);
-        
+
         await this.notificationServiceModule.createNotification({
             title: "New Login",
             body: `New login at ${new Date()}`,
@@ -326,7 +334,7 @@ class AuthenticationService{
 
     // -----------------------------Login Gmail-------------------------------
 
-    public async loginGmail (idToken : string , issuer:string ) : Promise<any> {
+    public async loginGmail(idToken: string, issuer: string): Promise<any> {
 
         const payload = await this.verifyGoogleAccount(idToken)
 
@@ -345,7 +353,7 @@ class AuthenticationService{
     // -------------------------------Forget Password------------------------------
 
     // 1 - Send Forgot Password OTP
-    public async forgetPassword (email : string) : Promise<void> {
+    public async forgetPassword(email: string): Promise<void> {
 
         const user = await this.userRepository.findOne({
             filter: {
@@ -365,8 +373,8 @@ class AuthenticationService{
 
 
     // 2 - Verify Forgot Password OTP
-    public async verifyForgetPasswordOtp (email : string , otp : string) : Promise<void> {
-        const hashOtp = await this.redis.get(this.redis.otpKey({ email , subject: EmailEnum.ForgotPassword}));
+    public async verifyForgetPasswordOtp(email: string, otp: string): Promise<void> {
+        const hashOtp = await this.redis.get(this.redis.otpKey({ email, subject: EmailEnum.ForgotPassword }));
         console.log(hashOtp);
         if (!hashOtp) {
             throw new NotFoundException("OTP expired");
@@ -378,7 +386,7 @@ class AuthenticationService{
     }
 
     // 3 - Reset Password
-    public async resetPassword (email : string , newPassword : string ) : Promise<void> {
+    public async resetPassword(email: string, newPassword: string): Promise<void> {
 
         const user = await this.userRepository.findOneAndUpdate({
             filter: {
@@ -387,7 +395,7 @@ class AuthenticationService{
                 confirmEmail: { $exists: true }
             },
             update: {
-                password: await generateHash({plaintext: newPassword}),
+                password: await generateHash({ plaintext: newPassword }),
                 changeCredentialsTime: new Date()
             },
         });
@@ -409,4 +417,3 @@ export default new AuthenticationService();
 
 
 
-  

@@ -40,6 +40,13 @@ class AuthenticationService {
             });
             throw new exceptions_1.conflictException(`You have reached max request trial count please try again later after 5 minutes`);
         }
+        const existingOtp = await this.redis.get(this.redis.otpKey({ email, subject }));
+        if (existingOtp) {
+            const remainingTime = await this.redis.ttl(this.redis.otpKey({ email, subject }));
+            if (remainingTime > 0) {
+                throw new exceptions_1.conflictException(`OTP already sent, please try again after ${remainingTime} seconds`);
+            }
+        }
         const code = await (0, utils_1.createNumberOtp)();
         await this.redis.set({
             key: this.redis.otpKey({ email, subject }),

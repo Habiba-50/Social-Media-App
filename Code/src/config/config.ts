@@ -60,3 +60,6 @@ export const AWS_BUCKET_NAME = process.env.AWS_BUCKET_NAME as string
 export const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID as string
 export const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY as string
 export const AWS_EXPIRES_IN = process.env.AWS_EXPIRES_IN as unknown as number 
+
+
+export const LOGO_URL = process.env.LOGO_URL as string

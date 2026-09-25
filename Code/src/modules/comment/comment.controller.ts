@@ -44,7 +44,7 @@ router.post(
     return successResponse({
       res,
       statusCode: 201,
-      message: "Post created successfully",
+      message: "Comment created successfully",
       data,
     });
   },
@@ -77,7 +77,7 @@ router.post(
     return successResponse({
       res,
       statusCode: 201,
-      message: "Post created successfully",
+      message: "Reply on comment created successfully",
       data,
     });
   },

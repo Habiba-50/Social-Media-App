@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AWS_EXPIRES_IN = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.AWS_BUCKET_NAME = exports.AWS_REGION = exports.ORIGINS = exports.TWITTER = exports.INSTAGRAM = exports.FACEBOOK = exports.SALT_ROUND = exports.WEB_CLIENT_ID = exports.REFRESH_TOKEN_EXPIRY = exports.ACCESS_TOKEN_EXPIRY = exports.User_REFRESH_JWT_SECRET = exports.User_JWT_SECRET = exports.System_REFRESH_JWT_SECRET = exports.System_JWT_SECRET = exports.EMAIL_APP_PASS = exports.EMAIL_APP = exports.IV_LENGTH = exports.ENCRYPTION_KEY = exports.REDIS_URL = exports.DB_URI = exports.APPLICATION_NAME = exports.port = exports.NODE_ENV = void 0;
+exports.LOGO_URL = exports.AWS_EXPIRES_IN = exports.AWS_SECRET_ACCESS_KEY = exports.AWS_ACCESS_KEY_ID = exports.AWS_BUCKET_NAME = exports.AWS_REGION = exports.ORIGINS = exports.TWITTER = exports.INSTAGRAM = exports.FACEBOOK = exports.SALT_ROUND = exports.WEB_CLIENT_ID = exports.REFRESH_TOKEN_EXPIRY = exports.ACCESS_TOKEN_EXPIRY = exports.User_REFRESH_JWT_SECRET = exports.User_JWT_SECRET = exports.System_REFRESH_JWT_SECRET = exports.System_JWT_SECRET = exports.EMAIL_APP_PASS = exports.EMAIL_APP = exports.IV_LENGTH = exports.ENCRYPTION_KEY = exports.REDIS_URL = exports.DB_URI = exports.APPLICATION_NAME = exports.port = exports.NODE_ENV = void 0;
 const node_path_1 = require("node:path");
 const dotenv_1 = require("dotenv");
 exports.NODE_ENV = (process.env.NODE_ENV ?? 'development');
@@ -35,3 +35,4 @@ exports.AWS_BUCKET_NAME = process.env.AWS_BUCKET_NAME;
 exports.AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
 exports.AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
 exports.AWS_EXPIRES_IN = process.env.AWS_EXPIRES_IN;
+exports.LOGO_URL = process.env.LOGO_URL;

@@ -44,6 +44,17 @@ export class FollowService {
             throw new NotFoundException("User not found");
         }
 
+        const followExists = await this.followRepository.findOne({
+            filter: {
+                followerId: user._id.toString(),
+                followingId,
+            },
+        });
+
+        if (followExists) {
+            throw new BadRequestException("You already follow this user");
+        }
+
         const session = await mongoose.startSession();
 
         let createdFollow: (HydratedDocument<IFollow> & { _id: Types.ObjectId }) | undefined;

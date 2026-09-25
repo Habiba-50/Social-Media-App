@@ -50,7 +50,7 @@ router.post("/", (0, middleware_1.authentication)(), (0, multer_1.cloudFileUploa
     return (0, response_1.successResponse)({
         res,
         statusCode: 201,
-        message: "Post created successfully",
+        message: "Comment created successfully",
         data,
     });
 });
@@ -64,7 +64,7 @@ router.post("/:commentId/reply", (0, middleware_1.authentication)(), (0, multer_
     return (0, response_1.successResponse)({
         res,
         statusCode: 201,
-        message: "Post created successfully",
+        message: "Reply on comment created successfully",
         data,
     });
 });
