@@ -5,11 +5,12 @@ import { toObjectId } from "../../common/utils/objectId";
 import { ChatRepository } from "../../DB/repository/chat.repository";
 import { ChatEnum, NotificationType } from "../../common/enums";
 import { UserRepository } from "../../DB/repository/user.repository";
-import { NotificationService, RedisService, s3Service } from "../../common/services";
+import { NotificationService, redisService, RedisService, s3Service } from "../../common/services";
 import { randomUUID } from "node:crypto";
 import { friendRequestService, FriendRequestService } from "../friendRequest";
 import { NotificationModuleService } from "../notification";
 import { BlockService } from "../block";
+import { realtimeGateway, RealtimeGatway } from "../realtime";
 
 
 export class ChatService {
@@ -21,6 +22,7 @@ export class ChatService {
     private notificationModuleService: NotificationModuleService
     private notificationService: NotificationService
     private blockService: BlockService
+    private realtimeGateway: RealtimeGatway
    
     constructor() {
         this.chatRepository = new ChatRepository()
@@ -29,9 +31,27 @@ export class ChatService {
         this.friendRequestService = friendRequestService
         this.notificationService = new NotificationService()
         this.notificationModuleService = new NotificationModuleService()
-        this.redisService = new RedisService()
+        this.redisService = redisService
         this.blockService = new BlockService()
+        this.realtimeGateway = realtimeGateway
     }
+
+
+    private async getOtherParticipantsSockets(
+        chat: HydratedDocument<IChat>,
+        excludeUserId: Types.ObjectId
+    ): Promise<string[]> {
+        const otherIds = chat.participants
+            .map((p) => p.toString())
+            .filter((id) => id !== excludeUserId.toString());
+
+        const socketsPerUser = await Promise.all(
+            otherIds.map((id) => this.redisService.getSockets(toObjectId(id)))
+        );
+
+        return socketsPerUser.flat();
+    }
+
 
     // ---------------------------- Check Chat Exisiting----------------------
 
@@ -168,6 +188,16 @@ export class ChatService {
             throw new NotFoundException("Message not found")
         }
         
+        // Socket.IO → notify everyone else in the chat, live
+        const socketIds = await this.getOtherParticipantsSockets(chat, user._id);
+        if (socketIds.length) {
+            this.realtimeGateway.getIo().to(socketIds).emit("message_edited", {
+                chatId: chat._id,
+                messageId,
+                content,
+            });
+        }
+
         return chat
     }
 
@@ -192,6 +222,14 @@ export class ChatService {
         })
         if (!chat) {
             throw new NotFoundException("Message not found")
+        }
+
+        const socketIds = await this.getOtherParticipantsSockets(chat, user._id);
+        if (socketIds.length) {
+            this.realtimeGateway.getIo().to(socketIds).emit("message_deleted", {
+                chatId: chat._id,
+                messageId,
+            });
         }
 
         return chat
@@ -488,8 +526,8 @@ export class ChatService {
         // 1️⃣ Chat must exist
         const chat = await this.checkExistingChat(chatId)
 
-        // 2️⃣ User is a patricipant & Only admin can add members
-        if (!chat.participants.includes(userId) || userId.toString() !== chat.createdBy.toString()) {
+        // 2️⃣ Only admin can add members
+        if (userId.toString() !== chat.createdBy.toString()) {
             throw new ForbiddenException("You are not authorized to add members to this chat");
         }
 
@@ -544,7 +582,7 @@ export class ChatService {
         // 8️⃣ Notification to each new member that they were added to the group
         for (const memberId of newMemberIds) {
             try {
-                console.log("hellooo")
+                // console.log("hellooo")
                 await this.notificationModuleService.createNotification({
                     title: "Added to group",
                     body: `You were added to ${chat.groupName}`,

@@ -18,7 +18,11 @@ exports.acceptRequest = {
 };
 exports.rejectRequest = exports.acceptRequest;
 exports.cancelRequest = exports.acceptRequest;
-exports.unfriend = exports.acceptRequest;
+exports.unfriend = {
+    params: zod_1.default.strictObject({
+        personId: validation_1.generalValidationFields.id
+    })
+};
 exports.checkStatus = {
     params: zod_1.default.strictObject({
         friendId: validation_1.generalValidationFields.id

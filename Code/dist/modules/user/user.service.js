@@ -8,6 +8,7 @@ const enums_1 = require("../../common/enums");
 const repository_1 = require("../../DB/repository");
 const chat_repository_1 = require("../../DB/repository/chat.repository");
 const block_service_1 = require("../block/block.service");
+const objectId_1 = require("../../common/utils/objectId");
 class UserService {
     userRepository;
     tokenService;
@@ -37,6 +38,13 @@ class UserService {
             }
         });
         return { user: profile, groups };
+    }
+    async profileById(id) {
+        const profile = await this.userRepository.findById((0, objectId_1.toObjectId)(id));
+        if (!profile) {
+            throw new exceptions_1.NotFoundException("User not found");
+        }
+        return { user: profile };
     }
     async rotateToken(user, { sub, jti, iat }, issuer) {
         if ((iat + config_1.ACCESS_TOKEN_EXPIRY) * 1000 >

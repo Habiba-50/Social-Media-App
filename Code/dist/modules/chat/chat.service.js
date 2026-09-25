@@ -11,6 +11,7 @@ const node_crypto_1 = require("node:crypto");
 const friendRequest_1 = require("../friendRequest");
 const notification_1 = require("../notification");
 const block_1 = require("../block");
+const realtime_1 = require("../realtime");
 class ChatService {
     chatRepository;
     userRepository;
@@ -20,6 +21,7 @@ class ChatService {
     notificationModuleService;
     notificationService;
     blockService;
+    realtimeGateway;
     constructor() {
         this.chatRepository = new chat_repository_1.ChatRepository();
         this.userRepository = new user_repository_1.UserRepository();
@@ -27,8 +29,16 @@ class ChatService {
         this.friendRequestService = friendRequest_1.friendRequestService;
         this.notificationService = new services_1.NotificationService();
         this.notificationModuleService = new notification_1.NotificationModuleService();
-        this.redisService = new services_1.RedisService();
+        this.redisService = services_1.redisService;
         this.blockService = new block_1.BlockService();
+        this.realtimeGateway = realtime_1.realtimeGateway;
+    }
+    async getOtherParticipantsSockets(chat, excludeUserId) {
+        const otherIds = chat.participants
+            .map((p) => p.toString())
+            .filter((id) => id !== excludeUserId.toString());
+        const socketsPerUser = await Promise.all(otherIds.map((id) => this.redisService.getSockets((0, objectId_1.toObjectId)(id))));
+        return socketsPerUser.flat();
     }
     async checkExistingChat(chatId) {
         const chat = await this.chatRepository.findOne({
@@ -127,6 +137,14 @@ class ChatService {
         if (!chat) {
             throw new exceptions_1.NotFoundException("Message not found");
         }
+        const socketIds = await this.getOtherParticipantsSockets(chat, user._id);
+        if (socketIds.length) {
+            this.realtimeGateway.getIo().to(socketIds).emit("message_edited", {
+                chatId: chat._id,
+                messageId,
+                content,
+            });
+        }
         return chat;
     }
     async deleteMessage({ chatId, messageId }, user) {
@@ -148,6 +166,13 @@ class ChatService {
         });
         if (!chat) {
             throw new exceptions_1.NotFoundException("Message not found");
+        }
+        const socketIds = await this.getOtherParticipantsSockets(chat, user._id);
+        if (socketIds.length) {
+            this.realtimeGateway.getIo().to(socketIds).emit("message_deleted", {
+                chatId: chat._id,
+                messageId,
+            });
         }
         return chat;
     }
@@ -364,7 +389,7 @@ class ChatService {
     }
     async addMembersToGroupChat(userId, chatId, memberIds) {
         const chat = await this.checkExistingChat(chatId);
-        if (!chat.participants.includes(userId) || userId.toString() !== chat.createdBy.toString()) {
+        if (userId.toString() !== chat.createdBy.toString()) {
             throw new exceptions_1.ForbiddenException("You are not authorized to add members to this chat");
         }
         const existingUserIds = chat.participants.map((p) => p.toString());
@@ -402,7 +427,6 @@ class ChatService {
         }
         for (const memberId of newMemberIds) {
             try {
-                console.log("hellooo");
                 await this.notificationModuleService.createNotification({
                     title: "Added to group",
                     body: `You were added to ${chat.groupName}`,

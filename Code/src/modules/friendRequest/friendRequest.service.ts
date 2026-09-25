@@ -487,20 +487,21 @@ export class FriendRequestService {
 
     //prevent unfriend if they are not friends (status = accepted)
 
-    public async unfriend(user: HydratedDocument<IUser>, friendRequestId: string) {
+    public async unfriend(user: HydratedDocument<IUser>, personId: string) {
 
         const userId = user._id.toString()
 
         const isFriendRequest = await this.friendRequestRepository.findOne({
             filter: {
-                _id: toObjectId(friendRequestId),
                 status: FriendRequestStatusEnum.ACCEPTED,
                 $or: [
-                    { senderId: toObjectId(userId) },
-                    { receiverId: toObjectId(userId) }
-                ]
+                    { senderId: toObjectId(userId), receiverId: toObjectId(personId) },
+                    { receiverId: toObjectId(userId), senderId: toObjectId(personId) }
+                ],
+                deletedAt: { $exists: false }
             },
         })
+        console.log(isFriendRequest)
 
         if (!isFriendRequest) throw new NotFoundException("You are not friends with this user")
         

@@ -52,6 +52,10 @@ router.get("/", (0, middleware_1.authentication)(), (0, middleware_1.authorizati
     const data = await user_service_1.default.profile(req.user);
     return (0, response_1.successResponse)({ res, statusCode: 200, data });
 });
+router.get("/:userId", (0, middleware_1.authentication)(), async (req, res, next) => {
+    const data = await user_service_1.default.profileById(req.params?.userId);
+    return (0, response_1.successResponse)({ res, statusCode: 200, data });
+});
 router.post("/rotate-token", (0, middleware_1.authentication)(enums_1.TokenTypeEnum.REFRESH), async (req, res, next) => {
     const data = await user_service_1.default.rotateToken(req.user, req.decoded, `${req.protocol}://${req.host}`);
     return (0, response_1.successResponse)({ res, statusCode: 200, data });

@@ -71,12 +71,12 @@ router.patch("/:requestId/cancel", (0, middleware_1.authentication)(), (0, middl
         data: cancelRequest
     });
 });
-router.patch("/:requestId/unfriend", (0, middleware_1.authentication)(), (0, middleware_1.validation)(validators.unfriend), async (req, res, next) => {
-    const cancelRequest = await friendRequest_service_1.friendRequestService.unfriend(req.user, req.params?.requestId);
+router.patch("/:personId/unfriend", (0, middleware_1.authentication)(), (0, middleware_1.validation)(validators.unfriend), async (req, res, next) => {
+    const unfriend = await friendRequest_service_1.friendRequestService.unfriend(req.user, req.params?.personId);
     return res.status(200).json({
         success: true,
         message: "Unfriended successfully",
-        data: cancelRequest
+        data: unfriend
     });
 });
 router.get("/:friendId/status", (0, middleware_1.authentication)(), (0, middleware_1.validation)(validators.checkStatus), async (req, res, next) => {

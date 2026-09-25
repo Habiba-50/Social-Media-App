@@ -18,7 +18,11 @@ export const rejectRequest = acceptRequest
 
 export const cancelRequest = acceptRequest
 
-export const unfriend = acceptRequest
+export const unfriend = {
+    params: z.strictObject({
+        personId: generalValidationFields.id
+    })
+}
 
 export const checkStatus = {
     params: z.strictObject({

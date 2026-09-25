@@ -304,18 +304,19 @@ class FriendRequestService {
         });
         return updatedFriendRequest;
     }
-    async unfriend(user, friendRequestId) {
+    async unfriend(user, personId) {
         const userId = user._id.toString();
         const isFriendRequest = await this.friendRequestRepository.findOne({
             filter: {
-                _id: (0, objectId_1.toObjectId)(friendRequestId),
                 status: enums_1.FriendRequestStatusEnum.ACCEPTED,
                 $or: [
-                    { senderId: (0, objectId_1.toObjectId)(userId) },
-                    { receiverId: (0, objectId_1.toObjectId)(userId) }
-                ]
+                    { senderId: (0, objectId_1.toObjectId)(userId), receiverId: (0, objectId_1.toObjectId)(personId) },
+                    { receiverId: (0, objectId_1.toObjectId)(userId), senderId: (0, objectId_1.toObjectId)(personId) }
+                ],
+                deletedAt: { $exists: false }
             },
         });
+        console.log(isFriendRequest);
         if (!isFriendRequest)
             throw new exceptions_1.NotFoundException("You are not friends with this user");
         if (isFriendRequest) {

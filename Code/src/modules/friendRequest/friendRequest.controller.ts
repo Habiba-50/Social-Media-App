@@ -77,15 +77,15 @@ router.patch("/:requestId/cancel", authentication(), validation(validators.cance
 //Unfriend
 
 //prevent unfriend if they are not friends (status = accepted)
-router.patch("/:requestId/unfriend", authentication(), validation(validators.unfriend), async (req: Request, res: Response, next: NextFunction) => {
-    const cancelRequest = await friendRequestService.unfriend(
+router.patch("/:personId/unfriend", authentication(), validation(validators.unfriend), async (req: Request, res: Response, next: NextFunction) => {
+    const unfriend = await friendRequestService.unfriend(
         req.user,
-        req.params?.requestId as string
+        req.params?.personId as string
     )
     return res.status(200).json({
         success: true,
         message: "Unfriended successfully",
-        data: cancelRequest
+        data: unfriend
     })
 })
 
