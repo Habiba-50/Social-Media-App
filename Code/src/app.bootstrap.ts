@@ -10,17 +10,26 @@ import { successResponse } from './common/response';
 import { createHandler } from 'graphql-http/lib/use/express';
 import { Server as HttpServerType } from 'http'
 import cors from 'cors';
+import helmet from "helmet";
+import { globalRateLimiter } from './middleware/rateLimit.middleware';
 
 const s3WriteStream = promisify(pipeline);
 
 const bootstrap = async () => {
     const app:express.Express = express();
 
+
+    // Helmet Middleware
+    app.use(helmet());
+
     // CORS Middleware
     app.use(cors ({
         origin: '*',
         credentials: true
     }));
+
+    // Rate Limiting Middleware
+    app.use(globalRateLimiter);
 
     app.get('/', (req: express.Request, res: express.Response, next: NextFunction) => {
         res.status(200).json({ message: "Landing page" });
