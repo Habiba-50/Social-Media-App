@@ -13,7 +13,7 @@ config({ path: resolve(process.cwd(), envPath[NODE_ENV]) })
 // config({ path: resolve(`./config/${envPath[NODE_ENV]}`) })
 // console.log({ path: resolve(`./${envPath[NODE_ENV]}`) })
 
-export const port = process.env.PORT ?? 7000
+export const port = process.env.PORT ?? 3000
 
 export const APPLICATION_NAME = process.env.APPLICATION_NAME as string
 
