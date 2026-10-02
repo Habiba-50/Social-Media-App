@@ -1,6 +1,7 @@
 import mongoose, { HydratedDocument, Types } from "mongoose";
 
 import { PostRepository } from "../../DB/repository";
+import { FollowRepository } from "../../DB/repository/follow.repository";
 import {
   mentionService,
   MentionService,
@@ -37,6 +38,7 @@ import { blockService } from "../block/block.service";
 
 export class PostService {
   private readonly postRepository: PostRepository;
+  private readonly followRepository: FollowRepository;
   // private readonly userRepository: UserRepository;
   private readonly mentionService: MentionService;
   private readonly commentService: CommentService
@@ -51,6 +53,7 @@ export class PostService {
 
   constructor() {
     this.postRepository = new PostRepository();
+    this.followRepository = new FollowRepository();
     // this.userRepository = new UserRepository();
     this.mentionService = mentionService;
     this.commentService = new CommentService();
@@ -752,8 +755,16 @@ export class PostService {
 
     // Task 2: Prepare people who are allowed to see the feed
     const friendIds = await this.friendRequestService.getAcceptedFriendIds(user._id);
+    const followingRelationships = await this.followRepository.findAll({
+      filter: { followerId: user._id, isDeleted: { $ne: true } },
+      projection: "followingId",
+      options: { lean: true },
+    });
+    const followedIds = (followingRelationships || [])
+      .map((relationship: any) => relationship.followingId)
+      .filter(Boolean);
     const blockedIds = await this.blockService.getBlockedUserIds(user._id);
-    const visibleUserIds = [user._id, ...friendIds].filter(
+    const visibleUserIds = [user._id, ...friendIds, ...followedIds].filter(
       (id) => !blockedIds.some((b) => b.toString() === id.toString())
     );
 
@@ -762,7 +773,15 @@ export class PostService {
       {
         $match: {
           deletedAt: { $exists: false },
-          $or: await getAvailability(user),
+          $and: [
+            { $or: await getAvailability(user) },
+            {
+              $or: [
+                { createdBy: { $in: visibleUserIds } },
+                { tags: { $in: [user._id] } },
+              ],
+            },
+          ],
         },
       },
       {

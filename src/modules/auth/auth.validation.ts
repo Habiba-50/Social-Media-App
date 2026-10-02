@@ -26,10 +26,6 @@ export const signup = {
     } , {
         error: "Passwords don't match",   
     }),
-
-    query : z.strictObject({
-        flag: z.coerce.boolean()
-    })
 }
 
 export const confirmEmail = {
