@@ -6,21 +6,32 @@ import { resolve } from "node:path";
 
 export class NotificationService {
 
-    private client: admin.app.App;
+    private client: admin.app.App | null = null;
     private redis: RedisService;
     
     constructor() {
         this.redis = redisService
 
-        const serviceAccount = JSON.parse(
-            readFileSync(resolve("./src/config/c45-route-74549-firebase-adminsdk-fbsvc-ca07563c99.json")).toString()
-        ) as string;
+        try {
+            // Production: key comes from environment variables.
+            // Local development: falls back to the (git-ignored) JSON file.
+            const serviceAccountJson =
+                [1, 2, 3, 4].map((i) => process.env[`FIREBASE_SERVICE_ACCOUNT_${i}`] ?? "").join("") ||
+                process.env.FIREBASE_SERVICE_ACCOUNT ||
+                readFileSync(
+                    resolve(process.cwd(), "src/config/c45-route-74549-firebase-adminsdk-fbsvc-ca07563c99.json"),
+                    "utf8"
+                );
+            const serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
 
-        this.client = admin.apps.length
-            ? admin.app()
-            : admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
+            this.client = admin.apps.length
+                ? admin.app()
+                : admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount)
+                });
+        } catch (error) {
+            console.error("Firebase init failed, push notifications are disabled:", (error as Error).message);
+        }
     }
 
 // Send Single Notification    
@@ -45,7 +56,7 @@ export class NotificationService {
         type: string;
     }) {
         try {
-            return await this.client.messaging().send({
+            return await this.client?.messaging().send({
                 token,
                 notification: {
                     title,
