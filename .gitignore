@@ -1,0 +1,22 @@
+# Dependencies and generated output (at any project depth)
+dist/
+
+# Local environment files; keep safe examples tracked
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Firebase service-account credentials
+/src/config/*.json
+/Code/src/config/*.json
+
+# Local/editor and OS files
+.DS_Store
+Thumbs.db
+
+# Project-local notes and reference images
+Issues.md
+feed_full_pipeline.png
+ِInbox_Pipeline.png
+node_modules
