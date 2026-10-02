@@ -14,6 +14,22 @@ import { commentRouter } from "../comment";
 const router = Router();
 router.use("/:postId/comment",commentRouter);
 
+const normalizePostTags = (req: Request, res: Response, next: NextFunction) => {
+    const { tags } = req.body;
+
+    if (typeof tags === "string") {
+        try {
+            const parsedTags = JSON.parse(tags);
+            req.body.tags = Array.isArray(parsedTags) ? parsedTags : [parsedTags];
+        } catch {
+            // Multipart requests with one repeated field arrive as a scalar.
+            req.body.tags = [tags];
+        }
+    }
+
+    next();
+};
+
 
 // Create Post
 router.post(
@@ -23,6 +39,7 @@ router.post(
         validation: fileFieldValidation.image
     }).array("attachments", 2),
 
+    normalizePostTags,
     validation(validators.createPost),
 
     async (

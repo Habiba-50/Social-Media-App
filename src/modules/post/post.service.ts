@@ -572,6 +572,7 @@ export class PostService {
       page,
       size,
       options: {
+        sort: { createdAt: -1 },
         populate: [
           { path: "likes.userId" },
           { path: "createdBy" },
