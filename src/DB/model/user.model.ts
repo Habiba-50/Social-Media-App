@@ -18,7 +18,7 @@ const userSchema = new Schema<IUser>({
 
     bio: { type: String },
 
-    phone: { type: String , required:true},
+    phone: { type: String },
     profilePicture: { type: String },
     profileCoveredPictures: { type: [String] },
 
@@ -63,7 +63,7 @@ userSchema.pre("save", async function () {
     if (this.isModified("password")) {
        this.password = await generateHash({plaintext: this.password })
    }
-    if (this.isModified("phone")) {
+    if (this.isModified("phone") && this.phone) {
         this.phone = await encrypt(this.phone!)
     }
 })

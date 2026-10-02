@@ -18,7 +18,7 @@ export const login = {
 export const signup = {
     body: login.body.safeExtend({
         username: generalValidationFields.username,
-        phone:generalValidationFields.phone,
+        phone: generalValidationFields.phone.optional(),
         confirmPassword: generalValidationFields.confirmPassword,
         gender: z.enum(GenderEnum, { error: "Invalid gender" }),
     }).refine((data) => {
