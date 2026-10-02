@@ -148,16 +148,20 @@ const bootstrap = async () => {
     // Global Error Handling Middleware
     app.use(globalErrorHandler);
 
+    const httpServer: HttpServerType = app.listen(port, () => {
+        console.log("Server is running on port 3000 🚀");
+    });
+
+    await realtimeGateway.initializeIO(httpServer);
+
     // Connect DB
     await connectDB();
     await redisService.connent()
     // await connectRedis()
 
-    const httpServer:HttpServerType = app.listen(port, () => {
-        console.log("Server is running on port 3000 🚀");
-    });
+   
 
-    await realtimeGateway.initializeIO(httpServer);
+    
     
 
     console.log("Application bootstrapped successfully!");
