@@ -66,7 +66,7 @@ router.post("/signup/gmail", async (req, res, next) => {
 // ---------------------------------Login Gmail----------------------------------------
 
 router.post("/login/gmail", async (req, res, next) => {
-  const credentials = await authService.loginGmail(req.body, `${req.protocol}://${req.host}`);
+  const credentials = await authService.loginGmail(req.body.idToken, `${req.protocol}://${req.host}`);
   return successResponse({ res, statusCode: 201, data: { ...credentials } });
 });
 
