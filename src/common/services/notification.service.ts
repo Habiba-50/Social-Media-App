@@ -1,6 +1,8 @@
 import admin from "firebase-admin";
 import { Types } from "mongoose";
 import { redisService, RedisService } from "./redis.service";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 export class NotificationService {
 
@@ -9,12 +11,10 @@ export class NotificationService {
     
     constructor() {
         this.redis = redisService
-        
-        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-        if (!serviceAccountJson) {
-            throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable is required");
-        }
-        const serviceAccount = JSON.parse(serviceAccountJson) as admin.ServiceAccount;
+
+        const serviceAccount = JSON.parse(
+            readFileSync(resolve("./src/config/c45-route-74549-firebase-adminsdk-fbsvc-ca07563c99.json")).toString()
+        ) as string;
 
         this.client = admin.apps.length
             ? admin.app()
