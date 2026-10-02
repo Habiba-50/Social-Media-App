@@ -4,6 +4,7 @@ import { PostRepository } from "../../DB/repository";
 import {
   mentionService,
   MentionService,
+  notificationService,
   NotificationService,
   redisService,
   RedisService,
@@ -57,7 +58,7 @@ export class PostService {
     this.redisService = redisService;
     this.realtimeGateway = realtimeGateway;
     this.notificationModuleService = new NotificationModuleService()
-    this.notificationService = new NotificationService()
+    this.notificationService = notificationService;
     this.friendRequestService = friendRequestService;  
     this.blockService = blockService;  
   }

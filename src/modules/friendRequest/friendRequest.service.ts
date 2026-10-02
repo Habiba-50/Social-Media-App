@@ -5,7 +5,7 @@ import { BlockRepository, FriendRequestRepository, UserRepository } from "../../
 import { IFriendRequest, IUser } from "../../common/interfaces";
 import { toObjectId } from "../../common/utils/objectId";
 import { NotificationModuleService } from "../notification";
-import { NotificationService, redisService, RedisService } from "../../common/services";
+import { notificationService, NotificationService, redisService, RedisService } from "../../common/services";
 
 
 export class FriendRequestService {
@@ -21,7 +21,7 @@ export class FriendRequestService {
         this.friendRequestRepository = new FriendRequestRepository()
         this.userRepository = new UserRepository()
         this.notificationModuleService = new NotificationModuleService()
-        this.notificationService = new NotificationService()
+        this.notificationService = notificationService
         this.redisService = redisService
         this.blockRepository = new BlockRepository()
     }

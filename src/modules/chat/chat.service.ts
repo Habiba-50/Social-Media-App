@@ -5,7 +5,7 @@ import { toObjectId } from "../../common/utils/objectId";
 import { ChatRepository } from "../../DB/repository/chat.repository";
 import { ChatEnum, NotificationType, ReactEnum } from "../../common/enums";
 import { UserRepository } from "../../DB/repository/user.repository";
-import { NotificationService, redisService, RedisService, s3Service } from "../../common/services";
+import { notificationService, NotificationService, redisService, RedisService, s3Service } from "../../common/services";
 import { randomUUID } from "node:crypto";
 import { friendRequestService, FriendRequestService } from "../friendRequest";
 import { NotificationModuleService } from "../notification";
@@ -29,7 +29,7 @@ export class ChatService {
         this.userRepository = new UserRepository()
         this.s3Service = s3Service
         this.friendRequestService = friendRequestService
-        this.notificationService = new NotificationService()
+        this.notificationService = notificationService
         this.notificationModuleService = new NotificationModuleService()
         this.redisService = redisService
         this.blockService = new BlockService()

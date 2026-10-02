@@ -7,7 +7,7 @@ import { AvailabilityEnum, NotificationType } from "../../common/enums";
 import { BadRequestException, NotFoundException } from "../../common/exceptions";
 import { Types } from "mongoose";
 import { NotificationModuleService } from "../notification";
-import { NotificationService, redisService, RedisService } from "../../common/services";
+import { notificationService, NotificationService, redisService, RedisService } from "../../common/services";
 
 
 
@@ -26,7 +26,7 @@ export class RepostService {
         this.blockRepository = new BlockRepository();
         this.notificationModuleService = new NotificationModuleService();
         this.redisService = redisService
-        this.notificationService = new NotificationService();
+        this.notificationService = notificationService;
     }
 
 

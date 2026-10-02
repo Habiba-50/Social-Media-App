@@ -1,7 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
 import { EmailEnum, NotificationType, ProviderEnum } from "../../common/enums";
 import { conflictException, NotFoundException } from "../../common/exceptions";
-import { NotificationService, RedisService, redisService, TokenService } from "../../common/services";
+import { notificationService, NotificationService, RedisService, redisService, TokenService } from "../../common/services";
 import { createNumberOtp } from "../../common/utils";
 import { emailEmitter, emailTemplate, sendEmail } from "../../common/utils/email";
 import { compareHash, generateHash } from "../../common/utils/security";
@@ -25,7 +25,7 @@ class AuthenticationService {
         this.userRepository = new UserRepository()
         this.redis = redisService
         this.tokenService = new TokenService()
-        this.notificationService = new NotificationService()
+        this.notificationService = notificationService
         this.notificationServiceModule = new NotificationModuleService()
     }
 
