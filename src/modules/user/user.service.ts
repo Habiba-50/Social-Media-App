@@ -436,7 +436,7 @@ export class UserService {
           { lastName: { $regex: search, $options: "i" } }
         ]
       },
-      projection: { _id: 1, firstName: 1, lastName: 1, profileImage: 1 },
+      projection: { _id: 1, firstName: 1, lastName: 1, profilePicture: 1 },
       page,
       size
     });

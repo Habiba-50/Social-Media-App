@@ -87,8 +87,7 @@ router.post("/logout", authentication(), async (req:Request, res:Response , next
 router.patch("/profile-image",
     authentication(),
     cloudFileUpload({
-        validation: fileFieldValidation.image,
-        maxSize: 10,
+        validation: fileFieldValidation.image
     }).single("image"),
     async (req: Request, res: Response, next: NextFunction) => {
         const data = await userService.uploadProfileImage(req.user, req.file as Express.Multer.File)

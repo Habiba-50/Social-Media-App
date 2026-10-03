@@ -325,6 +325,10 @@ class AuthenticationService {
             filter: { email: payload?.email, provider: ProviderEnum.GOOGLE },
         });
 
+        if (!user) {
+            throw new NotFoundException("Invalid Account");
+        }
+
         if (user?.provider as ProviderEnum !== ProviderEnum.GOOGLE) {
             throw new conflictException("Account already exists with different provider");
         }
