@@ -322,7 +322,7 @@ class AuthenticationService {
         const payload = await this.verifyGoogleAccount(idToken)
 
         const user = await this.userRepository.findOne({
-            filter: { email: payload?.email, provider: ProviderEnum.GOOGLE },
+            filter: { email: payload?.email},
         });
 
         if (!user) {
