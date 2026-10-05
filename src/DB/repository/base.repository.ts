@@ -18,7 +18,7 @@ import {
 import { IPaginate } from "../../common/interfaces";
 
 export class DatabaseRepository<TRawDocument> {
-  constructor(protected readonly model: Model<TRawDocument>) {}
+  constructor(protected readonly model: Model<TRawDocument>) { }
 
   // ----------------------------------------Create method overloads----------------------------------------
 
@@ -148,7 +148,7 @@ export class DatabaseRepository<TRawDocument> {
     let doc = this.model.findOne(filter, projection, options);
 
     if (options?.populate) {
-       doc.populate(options.populate as PopulateOptions);
+      doc.populate(options.populate as PopulateOptions);
     }
     if (options?.lean) {
        doc.lean(options.lean) as any;
@@ -171,10 +171,10 @@ export class DatabaseRepository<TRawDocument> {
     let doc = this.model.find(filter, projection, options);
 
     if (options?.populate) {
-       doc.populate(options.populate as PopulateOptions);
+      doc.populate(options.populate as PopulateOptions);
     }
     if (options?.lean) {
-       doc.lean(options.lean) as any;
+      doc.lean(options.lean) as any;
     }
     return await doc.exec();
   }
@@ -182,7 +182,7 @@ export class DatabaseRepository<TRawDocument> {
   // ---------------------------------------- Paginate -----------------------------------
 
   async paginate({
-    filter ,
+    filter,
     projection,
     options = {},
     page = 0,
@@ -193,10 +193,10 @@ export class DatabaseRepository<TRawDocument> {
     options?: QueryOptions<TRawDocument>;
     page?: number | string | undefined;
     size?: number | string | undefined;
-  }): Promise<IPaginate<TRawDocument>> {    
-    
+  }): Promise<IPaginate<TRawDocument>> {
+
     let count: number = -1
-    
+
     if (Number(page) > 0) {
       page = Number(page);
       size = Number(size);
@@ -204,8 +204,8 @@ export class DatabaseRepository<TRawDocument> {
       options.limit = size;
       count = await this.model.countDocuments(filter || {}) as number;
     }
-    
-    const docs = await this.findAll({filter: filter || {} , projection, options});
+
+    const docs = await this.findAll({ filter: filter || {}, projection, options });
 
     return {
       docs: docs as HydratedDocument<TRawDocument>[],
@@ -213,7 +213,7 @@ export class DatabaseRepository<TRawDocument> {
     };
   }
 
- 
+
 
   // ----------------------------------------Find BY ID -----------------------------------
 
@@ -252,15 +252,15 @@ export class DatabaseRepository<TRawDocument> {
   > {
     let doc = this.model.findById(_id, projection);
     if (options?.populate) {
-     doc.populate(options.populate as PopulateOptions);
+      doc.populate(options.populate as PopulateOptions);
     }
     if (options?.lean) {
-       doc.lean(options.lean);
+      doc.lean(options.lean);
     }
     return await doc.exec();
   }
 
-// ------------------------------- Find & Update / Find & Delete -------------------------------
+  // ------------------------------- Find & Update / Find & Delete -------------------------------
 
   // find one and update
   async findOneAndUpdate({
@@ -271,9 +271,9 @@ export class DatabaseRepository<TRawDocument> {
     filter: QueryFilter<TRawDocument>;
     update: UpdateQuery<TRawDocument> | UpdateWithAggregationPipeline;
     options?: QueryOptions<TRawDocument>;
-    }): Promise<HydratedDocument<TRawDocument> | null> {
+  }): Promise<HydratedDocument<TRawDocument> | null> {
     if (Array.isArray(update)) {
-       return await this.model.findOneAndUpdate(filter, update, { new: true, ...options, updatePipeline:true });
+      return await this.model.findOneAndUpdate(filter, update, { new: true, ...options, updatePipeline: true });
     }
     return await this.model.findOneAndUpdate(filter, { ...update, $inc: { __v: 1 } }, { new: true, ...options });
   }
@@ -364,8 +364,8 @@ export class DatabaseRepository<TRawDocument> {
     filter = {},
     options,
   }: {
-      filter: QueryFilter<TRawDocument>;
-      options?: QueryOptions<TRawDocument>;
+    filter: QueryFilter<TRawDocument>;
+    options?: QueryOptions<TRawDocument>;
   }): Promise<DeleteResult> {
     return await this.model.deleteOne(filter, options as any);
   }

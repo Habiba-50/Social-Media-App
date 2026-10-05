@@ -13,7 +13,11 @@ export class NotificationModuleService {
     }
 
     private formatNotification(notification: any): IFormattedNotification {
-        const sender = notification.senderId;
+        // Check if senderId is populated
+        const sender = notification.senderId && typeof notification.senderId === "object"
+            ? notification.senderId
+            : null;
+        // Check if referenceId is populated
         const ref = notification.referenceId;
 
         let text: string = "";
@@ -21,7 +25,7 @@ export class NotificationModuleService {
         let chatId: Types.ObjectId | null = null;
         let requestId: Types.ObjectId | null = null;
         let friendRequestStatus: string | null = null;
-        const senderName = sender.username || [sender.firstName, sender.lastName].filter(Boolean).join(" ") || "Someone";
+        const senderName = sender?.username || [sender?.firstName, sender?.lastName].filter(Boolean).join(" ") || "Someone";
 
         switch (notification.type) {
             case NotificationType.LIKE:
@@ -50,12 +54,12 @@ export class NotificationModuleService {
                 text = `${senderName} tagged you in a post${ref?.content ? `: "${ref.content}"` : ""}`;
                 postId = ref?.postId ?? ref?._id;
                 break;
-            
+
             case NotificationType.NEW_LOGIN:
                 text = `New login from new device`;
                 postId = null;
                 break;
-            
+
             case NotificationType.MENTION:
                 text = `${senderName} mentioned you in a comment${ref?.content ? `: "${ref.content}"` : ""}`;
                 postId = ref?.postId;
@@ -101,9 +105,9 @@ export class NotificationModuleService {
             type: notification.type,
             text,
             sender: {
-                id: sender._id,
+                id: sender?._id ?? notification.senderId?.toString?.() ?? "",
                 username: senderName,
-                profileImage: sender.profilePicture || sender.profileImage,
+                profileImage: sender?.profilePicture || sender?.profileImage,
             },
             postId,
             ...(requestId ? { requestId } : {}),
@@ -136,7 +140,7 @@ export class NotificationModuleService {
         messageId?: Types.ObjectId;
         onModel?: string;
     }) {
-        
+
         await this.notificationRepository.create({
             data: {
                 title,
@@ -195,13 +199,13 @@ export class NotificationModuleService {
                 ]
             }
         });
-    
+
         return {
             ...notifications,
             docs: (notifications.docs || []).map((notification) => this.formatNotification(notification)),
         };
     }
-    
+
     // ---------------------------- Get Notification By Id ------------------------------------------
     public async getNotificationById(notificationId: string, user: IUser & { _id: Types.ObjectId }) {
         const data = await this.notificationRepository.findOneAndUpdate({
@@ -268,7 +272,7 @@ export class NotificationModuleService {
     // -------------------------- Delete Notification -----------------------------------
     public async deleteNotification(notificationId: string, user: IUser & { _id: Types.ObjectId }) {
         const data = await this.notificationRepository.findOneAndUpdate({
-            filter: { _id: notificationId, receiverId: user._id, isDeleted: { $exists: false} },
+            filter: { _id: notificationId, receiverId: user._id, isDeleted: { $exists: false } },
             update: { isDeleted: true },
             options: {
                 populate: [
