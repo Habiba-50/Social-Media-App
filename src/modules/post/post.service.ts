@@ -2,6 +2,7 @@ import mongoose, { HydratedDocument, Types } from "mongoose";
 
 import { PostRepository } from "../../DB/repository";
 import { FollowRepository } from "../../DB/repository/follow.repository";
+import { RepostRepository } from "../../DB/repository/repost.repository";
 import {
   mentionService,
   MentionService,
@@ -49,6 +50,7 @@ export class PostService {
   private readonly notificationService: NotificationService
   private readonly friendRequestService: FriendRequestService; 
   private readonly blockService: BlockService;  
+  private readonly repostRepository: RepostRepository;
 
 
   constructor() {
@@ -64,6 +66,7 @@ export class PostService {
     this.notificationService = notificationService;
     this.friendRequestService = friendRequestService;  
     this.blockService = blockService;  
+    this.repostRepository = new RepostRepository();
   }
 
   private normalizePostResponse(post: any) {
@@ -768,11 +771,21 @@ export class PostService {
       (id) => !blockedIds.some((b) => b.toString() === id.toString())
     );
 
+    // Fetch IDs of posts already reposted by visible users to avoid showing them twice
+    const repostDocs = await this.repostRepository.findAll({
+      filter: { deletedAt: { $exists: false }, repostedBy: { $in: visibleUserIds } },
+      projection: "originalPostId",
+      options: { lean: true },
+    });
+    const repostedOriginalIds = (repostDocs || []).map((r: any) => r.originalPostId).filter(Boolean);
+
     const pipeline = [
       // Task 3: Posts path with the same availability logic
       {
         $match: {
           deletedAt: { $exists: false },
+          // Exclude posts that are already shown as reposts to avoid duplicates
+          ...(repostedOriginalIds.length ? { _id: { $nin: repostedOriginalIds } } : {}),
           $and: [
             { $or: await getAvailability(user) },
             {
