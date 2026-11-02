@@ -756,7 +756,7 @@ export class PostService {
     const size = query.size || 20;
     const skip = (page - 1) * size;
 
-    // Task 2: Prepare people who are allowed to see the feed
+    // Prepare people who are allowed to see the feed
     const friendIds = await this.friendRequestService.getAcceptedFriendIds(user._id);
     const followingRelationships = await this.followRepository.findAll({
       filter: { followerId: user._id, isDeleted: { $ne: true } },
@@ -780,7 +780,7 @@ export class PostService {
     const repostedOriginalIds = (repostDocs || []).map((r: any) => r.originalPostId).filter(Boolean);
 
     const pipeline = [
-      // Task 3: Posts path with the same availability logic
+      // Posts path with the same availability logic
       {
         $match: {
           deletedAt: { $exists: false },
@@ -804,7 +804,7 @@ export class PostService {
         },
       },
 
-      // Task 4: Repost path with $unionWith
+      // Repost path with $unionWith
       {
         $unionWith: {
           coll: "SOCIAL_MEDIA_APP_REPOSTS",
@@ -845,7 +845,7 @@ export class PostService {
         },
       },
 
-      // Task 5: sorting and pagination
+      // Sorting and pagination
       { $sort: { itemDate: -1 } },
       {
         $facet: {

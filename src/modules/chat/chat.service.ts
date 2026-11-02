@@ -480,6 +480,42 @@ export class ChatService {
             }
         })
 
+        // Persist an in-app notification and send a push to each invited member.
+        for (const participantId of participantsIds) {
+            const title = "Added to group";
+            const messageBody = `You were added to ${chatingGroup.groupName}`;
+            try {
+                await this.notificationModuleService.createNotification({
+                    title,
+                    body: messageBody,
+                    senderId: user._id,
+                    receiverId: participantId,
+                    type: NotificationType.GROUP_ADD,
+                    onModel: "Chat",
+                    referenceId: chatingGroup._id,
+                });
+            } catch (error) {
+                console.error("Failed to create group invitation notification:", error);
+            }
+            try {
+                const tokens = await this.redisService.getFCMs(participantId);
+                if (tokens?.length) {
+                    await this.notificationService.sendNotifications({
+                        userId: participantId,
+                        tokens,
+                        title,
+                        body: messageBody,
+                        entityId: chatingGroup._id.toString(),
+                        entityType: "chat",
+                        senderId: user._id.toString(),
+                        type: NotificationType.GROUP_ADD,
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to send group invitation push:", error);
+            }
+        }
+
         return chatingGroup
     }
 
@@ -572,6 +608,47 @@ export class ChatService {
         if (!chat) {
             throw new NotFoundException("Fail to send message in group.")
         }
+
+        const recipients = chat.participants
+            .map((participant) => participant instanceof Types.ObjectId
+                ? participant
+                : toObjectId((participant as any)._id.toString()))
+            .filter((participantId) => participantId.toString() !== user._id.toString());
+        const title = `New message in ${chat.groupName}`;
+        const body = `${user.username || "A group member"}: ${content}`;
+        await Promise.all(recipients.map(async (receiverId) => {
+            try {
+                await this.notificationModuleService.createNotification({
+                    title,
+                    body,
+                    senderId: user._id,
+                    receiverId,
+                    type: NotificationType.GROUP_MESSAGE,
+                    onModel: "Chat",
+                    referenceId: chat._id,
+                    messageId,
+                });
+            } catch (error) {
+                console.error("Failed to create group message notification:", error);
+            }
+            try {
+                const tokens = await this.redisService.getFCMs(receiverId);
+                if (tokens?.length) {
+                    await this.notificationService.sendNotifications({
+                        userId: receiverId,
+                        tokens,
+                        title,
+                        body,
+                        entityId: chat._id.toString(),
+                        entityType: "chat",
+                        senderId: user._id.toString(),
+                        type: NotificationType.GROUP_MESSAGE,
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to send group message push:", error);
+            }
+        }));
 
         return { roomId: chat.roomId, messageId: messageId.toString() }
     }

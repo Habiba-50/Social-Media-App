@@ -84,6 +84,12 @@ export class NotificationModuleService {
                 chatId = ref?._id ?? notification.referenceId ?? null;
                 break;
 
+            case NotificationType.GROUP_ADD:
+            case NotificationType.GROUP_MESSAGE:
+                text = notification.body;
+                chatId = ref?._id ?? notification.referenceId ?? null;
+                break;
+
             case NotificationType.FRIEND_REQUEST:
                 if (ref?.status === "ACCEPTED") {
                     text = `${senderName} accepted your friend request`;

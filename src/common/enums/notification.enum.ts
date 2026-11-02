@@ -11,4 +11,5 @@ export enum NotificationType {
     REPOST = "REPOST",
     GROUP_ADD = "GROUP_ADD",
     MESSAGE_REACTION = "MESSAGE_REACTION",
+    GROUP_MESSAGE = "GROUP_MESSAGE",
 }
