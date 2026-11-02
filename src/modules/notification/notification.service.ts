@@ -180,6 +180,7 @@ export class NotificationModuleService {
             filter: {
                 receiverId: user._id,
                 isDeleted: { $exists: false },
+                type: { $ne: NotificationType.GROUP_MESSAGE },
                 ...(search ? { title: { $regex: search, $options: "i" }, body: { $regex: search, $options: "i" } } : {}),
             },
             page,
@@ -237,6 +238,7 @@ export class NotificationModuleService {
             receiverId: user._id,
             isRead: false,
             isDeleted: { $exists: false },
+            type: { $ne: NotificationType.GROUP_MESSAGE },
         })
 
         return { count: data };
@@ -258,7 +260,7 @@ export class NotificationModuleService {
         { page, size }: { page: number | string | undefined; size: number | string | undefined },
     ) {
         const notifications = await this.notificationRepository.paginate({
-            filter: { receiverId: user._id, isRead: false },
+            filter: { receiverId: user._id, isRead: false, type: { $ne: NotificationType.GROUP_MESSAGE } },
             page,
             size,
             options: {

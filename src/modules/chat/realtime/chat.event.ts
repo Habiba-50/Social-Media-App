@@ -66,11 +66,16 @@ export class ChatEvent {
             try {
                 // console.log(groupId, content);
                 await SocketValidation(validators.sendGroupMessage, { groupId, content })
-                const { roomId, messageId } = await chatService.sendGroupMessage({ groupId, content }, socket.data.user)
+                const { recipientIds, messageId } = await chatService.sendGroupMessage({ groupId, content }, socket.data.user)
 
                 const socketIds = await this.redisService.getSockets(socket.data.user._id.toString())
                 io.to(socketIds).emit("successMessage", { content, groupId, messageId });
-                socket.to(roomId).emit("newMessage", { content, groupId, messageId, from: socket.data.user });
+                const recipientSocketIds = (await Promise.all(
+                    recipientIds.map((recipientId) => this.redisService.getSockets(recipientId))
+                )).flat();
+                if (recipientSocketIds.length) {
+                    io.to(recipientSocketIds).emit("newMessage", { content, groupId, messageId, from: socket.data.user });
+                }
 
             } catch (error) {
                 return socket.emit("custom_error", toSocketError(error))

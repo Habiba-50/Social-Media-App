@@ -36,6 +36,18 @@ export class ChatService {
         this.realtimeGateway = realtimeGateway
     }
 
+    private async emitNotificationCreated(receiverId: Types.ObjectId | string, payload: Record<string, unknown>) {
+        try {
+            const socketIds = await this.redisService.getSockets(receiverId);
+            if (socketIds.length) {
+                this.realtimeGateway.getIo().to(socketIds).emit("newNotification", payload);
+            }
+        } catch (error) {
+            // The database notification is already saved; realtime delivery is best-effort.
+            console.error("Failed to emit realtime notification:", error);
+        }
+    }
+
 
     private async getOtherParticipantsSockets(
         chat: HydratedDocument<IChat>,
@@ -494,6 +506,10 @@ export class ChatService {
                     onModel: "Chat",
                     referenceId: chatingGroup._id,
                 });
+                await this.emitNotificationCreated(participantId, {
+                    type: NotificationType.GROUP_ADD,
+                    chatId: chatingGroup._id.toString(),
+                });
             } catch (error) {
                 console.error("Failed to create group invitation notification:", error);
             }
@@ -585,7 +601,7 @@ export class ChatService {
 
     // ----------------------------- Send Group Message -----------------------------------
 
-    async sendGroupMessage({ groupId, content }: { groupId: string, content: string }, user: HydratedDocument<IUser>): Promise<{ roomId: string, messageId: string }> {
+    async sendGroupMessage({ groupId, content }: { groupId: string, content: string }, user: HydratedDocument<IUser>): Promise<{ recipientIds: string[], messageId: string }> {
         const messageId = new Types.ObjectId();
 
         const chat = await this.chatRepository.findOneAndUpdate({
@@ -614,43 +630,11 @@ export class ChatService {
                 ? participant
                 : toObjectId((participant as any)._id.toString()))
             .filter((participantId) => participantId.toString() !== user._id.toString());
-        const title = `New message in ${chat.groupName}`;
-        const body = `${user.username || "A group member"}: ${content}`;
-        await Promise.all(recipients.map(async (receiverId) => {
-            try {
-                await this.notificationModuleService.createNotification({
-                    title,
-                    body,
-                    senderId: user._id,
-                    receiverId,
-                    type: NotificationType.GROUP_MESSAGE,
-                    onModel: "Chat",
-                    referenceId: chat._id,
-                    messageId,
-                });
-            } catch (error) {
-                console.error("Failed to create group message notification:", error);
-            }
-            try {
-                const tokens = await this.redisService.getFCMs(receiverId);
-                if (tokens?.length) {
-                    await this.notificationService.sendNotifications({
-                        userId: receiverId,
-                        tokens,
-                        title,
-                        body,
-                        entityId: chat._id.toString(),
-                        entityType: "chat",
-                        senderId: user._id.toString(),
-                        type: NotificationType.GROUP_MESSAGE,
-                    });
-                }
-            } catch (error) {
-                console.error("Failed to send group message push:", error);
-            }
-        }));
 
-        return { roomId: chat.roomId, messageId: messageId.toString() }
+        return {
+            recipientIds: recipients.map((participantId) => participantId.toString()),
+            messageId: messageId.toString(),
+        };
     }
 
 
@@ -884,6 +868,10 @@ export class ChatService {
                     type: NotificationType.GROUP_ADD,
                     onModel: "Chat",
                     referenceId: chat._id,
+                });
+                await this.emitNotificationCreated(memberId, {
+                    type: NotificationType.GROUP_ADD,
+                    chatId: chat._id.toString(),
                 });
             } catch (error) {
                 console.log("Failed to create notification:", error);
