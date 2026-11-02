@@ -432,11 +432,12 @@ export class UserService {
         _id: { $ne: user._id, $nin: blockedIds },
         deletedAt: { $exists: false },
         $or: [
+          { username: { $regex: search, $options: "i" } },
           { firstName: { $regex: search, $options: "i" } },
           { lastName: { $regex: search, $options: "i" } }
         ]
       },
-      projection: { _id: 1, firstName: 1, lastName: 1, profilePicture: 1 },
+      projection: { _id: 1, username: 1, firstName: 1, lastName: 1, profilePicture: 1 },
       page,
       size
     });
